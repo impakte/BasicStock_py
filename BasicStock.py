@@ -3,6 +3,8 @@ import tkMessageBox
 import ttk
 import sqlite3
 import datetime
+import tkFont
+import ttk
 
 W_main = Tk()
 W_main.geometry("1200x800")
@@ -161,7 +163,7 @@ def update_quantity(barecode, quantity, window):
     db.commit()
     window.destroy()
     
-def display_addquantity_window(barecode):
+def display_addquantity_window(barecode, window):
     W_addquantity_window = Tk()
     W_addquantity_window.geometry("400x100")
     W_addquantity_window.title("Ajouter une quantitée")
@@ -172,7 +174,50 @@ def display_addquantity_window(barecode):
     B_validation = Button(W_addquantity_window, bg = "White", text="Valider",
                           command= lambda: update_quantity(barecode, E_quantity.get(), W_addquantity_window))
     B_validation.place(x=140, y=60)
+    window.destroy()
     
+def recreate_product(barecode, buyprice, window):
+    cursor.execute("""SELECT societycode, description, Quantity, estimateprice, provider, weight FROM stock WHERE barecode=?""", (barecode,))
+    knownProduct = cursor.fetchone()
+    product = {"barecode" : barecode,
+               "societycode" : knownProduct[0],
+               "description" : knownProduct[1],
+               "Quantity" : int(knownProduct[2]),
+               "buyprice" : float(buyprice),
+               "estimateprice" : float(knownProduct[3]),
+               "provider" : knownProduct[4],
+               "weight" : float(knownProduct[5]),
+               "date" : str(datetime.datetime.now().date())
+               }
+    cursor.execute("""
+    INSERT INTO stock(barecode, societycode, description, Quantity, buyprice, estimateprice, provider, weight, date) VALUES(:barecode, :societycode, :description, :Quantity, :buyprice, :estimateprice, :provider, :weight, :date)""", product)
+    db.commit()
+    window.destroy()
+    
+def update_price(barecode, window):
+    W_updateprice_window = Tk()
+    W_updateprice_window.geometry("400x100")
+    W_updateprice_window.title("Réenregistrer ce produit")
+    L_buyprice = Label(W_updateprice_window, text="Prix d'achat:")
+    L_buyprice.place(x=5, y=20)
+    E_buyprice=Entry(W_updateprice_window)
+    E_buyprice.place(x=120, y=20)
+    B_validation = Button(W_updateprice_window, bg = "White", text="Valider",
+                          command= lambda: recreate_product(barecode, E_buyprice.get(), W_updateprice_window))
+    B_validation.place(x=140, y=60)
+    window.destroy()
+    
+def display_knownproduct_window(barecode):
+    W_knownproduct_window = Tk()
+    W_knownproduct_window.geometry("400x100")
+    W_knownproduct_window.title("Produit connu")
+    B_addquantity = Button(W_knownproduct_window, bg="White", text="Ajouter une quantité",
+                           command= lambda: display_addquantity_window(barecode, W_knownproduct_window))
+    B_addquantity.place(x=50, y=50)
+    B_addsameproduct = Button(W_knownproduct_window, bg="White", text="Réenregistrer ce produit",
+                              command = lambda: update_price(barecode, W_knownproduct_window))
+    B_addsameproduct.place(x=250, y=50)
+        
 def check_product(barecode, window):
     print barecode
     id = 2
@@ -183,7 +228,7 @@ def check_product(barecode, window):
     if (response == None):
         display_newproduct_window(barecode)
     else:
-        display_addquantity_window(barecode)
+        display_knownproduct_window(barecode)
     return
 
 def display_addproduct_window():
@@ -200,23 +245,50 @@ def display_addproduct_window():
     B_validation = Button(W_product, bg = "White", text="Valider",
                           command= lambda: check_product(E_barecode.get(), W_product))
     B_validation.place(x=140, y=60)
-    
+
 def display_stock_window():
-    stock_open = True
     W_Stock = Tk()
-    W_Stock.geometry("1200x800")
+    W_Stock.geometry("1400x800")
     W_Stock.title("Stock")
     label = Label(W_Stock, text="Stock")
     label.place(x=550, y=10)
-    scrollbar = Scrollbar(W_Stock, orient="vertical")
-    scrollbar.place(x=1070, y=10)
-    table = Listbox(W_Stock, height = 45, width = 175, yscrollcommand=scrollbar.set)
-    table.place(x= 10, y=10)
-    scrollbar.config(command=table.yview)
     cursor.execute("""SELECT barecode, societycode, description, Quantity, buyprice, estimateprice, provider, weight, date FROM stock""")
-    db.commit()
+    #db.commit()
+    listbox = ttk.Treeview(W_Stock, height = 35, columns=('barecode', 'societycode', 'description', 'Quantity', 'buyprice', 'estimateprice', 'provider', 'weight', 'date'))
+    listbox.column('barecode', width=100, anchor='center')
+    listbox.heading('barecode', text='Code Barre')
+    listbox.column('societycode', width=100, anchor='center')
+    listbox.heading('societycode', text='Code Societe')
+    listbox.column('description', width=200, anchor='center')
+    listbox.heading('description', text='Description')
+    listbox.column('Quantity', width=100, anchor='center')
+    listbox.heading('Quantity', text='Quantitée')
+    listbox.column('buyprice', width=100, anchor='center')
+    listbox.heading('buyprice', text='Prix achat')
+    listbox.column('estimateprice', width=100, anchor='center')
+    listbox.heading('estimateprice', text='Prix Minimum')
+    listbox.column('provider', width=100, anchor='center')
+    listbox.heading('provider', text='Fournisseur')
+    listbox.column('weight', width=100, anchor='center')
+    listbox.heading('weight', text='Poids')
+    listbox.column('date', width=100, anchor='center')
+    listbox.heading('date', text='Date')
+    listbox.place(x=10, y=10)
+    i = 0
     for row in cursor:
-        table.insert('end', row)
+        listbox.insert('', 'end', text=i, values=(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8]))
+        i += 1
+
+def display_finance_window():
+    W_finance = Tk()
+    W_finance.geometry("1400x800")
+    W_finance.title("Finance")
+    cursor.execute("""SELECT barecode, societycode, description, Quantity, buyprice, estimateprice, provider, weight, date FROM stock""")
+    stockbuyvalue = 0
+    for row in cursor:
+        stockbuyvalue += row[4]
+    L_StockBuyValue = Label(W_finance, text="Valeur d'achat du stock :" + str(stockbuyvalue) + "€")
+    L_StockBuyValue.pack()
     
 def display_main_window():
     label = Label(W_main, text="BasicStock")
@@ -225,6 +297,8 @@ def display_main_window():
     B_Product.place(x = 100, y=300)
     B_Stock = Button(W_main, bg="White", text="Afficher le tableau des Stocks", command=display_stock_window)
     B_Stock.place(x = 100, y=600)
+    B_Finance = Button(W_main, bg ="White", text="Finance", command=display_finance_window)
+    B_Finance.place(x=500, y = 400)
 
 
 display_main_window()
